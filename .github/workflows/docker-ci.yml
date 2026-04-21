@@ -29,7 +29,7 @@ jobs:
         with:
           image: genai-chat:${{ github.sha }}
           format: spdx-json
-          output-file: genai-chat-sbom.spdx.json
+          output-file: genai-chat-sbom-spdx.json
       - name: Upload SBoM
         uses: actions/upload-artifact@v7.0.1
         with:
