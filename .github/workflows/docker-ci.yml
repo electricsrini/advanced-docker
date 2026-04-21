@@ -25,7 +25,7 @@ jobs:
           tags: genai-chat:${{ github.sha }}
           load: true
       - name: Generate SBoM with Syft
-        uses: anchore/sbom-action@v0.15.11
+        uses: anchore/sbom-action@v0
         with:
           image: genai-chat:${{ github.sha }}
           format: spdx-json
