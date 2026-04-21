@@ -1,0 +1,66 @@
+name: docker-ci
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+      - name: Setup BuildX
+        uses: docker/setup-buildx-action@v4.0.0
+      - name: Build Image
+        uses: docker/build-push-action@v7.1.0
+        with:
+          context: exercises/02-genai-module-coach
+          file: exercises/02-genai-module-coach/Dockerfile
+          tags: genai-chat:${{ github.sha }}
+          load: true
+      - name: Generate SBoM with Syft
+        uses: anchore/sbom-action@v0.15.11
+        with:
+          image: genai-chat:${{ github.sha }}
+          format: spdx-json
+          output-file: genai-chat-sbom.spdx.json
+      - name: Upload SBoM
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: genai-chat-sbom
+          path: genai-chat-sbom.spdx.json
+      - name: Scan Image with Trivy
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          image-ref: genai-chat:${{ github.sha }}
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL, HIGH
+          ignore-unfixed: true
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+      - name: Login to DockerHub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4.1.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Tag image for DockerHub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker tag genai-chat:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/genai-chat:${{ github.sha }}
+          docker tag genai-chat:${{ github.sha }} ${{ secrets.DOCKERHUB_USERNAME }}/genai-chat:latest
+      - name: Push image for DockerHub
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genai-chat:${{ github.sha }}
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/genai-chat:latest
+          
